@@ -1,0 +1,12 @@
+{
+    "My": {
+        "gain": 1,
+        "offset": 0,
+        "lever_arm": 1
+    },
+    "Mz": {
+        "gain": 1,
+        "offset": 0,
+        "lever_arm": 1
+    }
+}
