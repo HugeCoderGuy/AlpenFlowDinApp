@@ -66,6 +66,9 @@ void set_sensor_state() {
       SetupMy(false);
       digitalWrite(LED_PIN, LOW);
     }
+    else if (input == 3) {
+      Serial.println("AlpenFlow");
+    }
   }
 }
 

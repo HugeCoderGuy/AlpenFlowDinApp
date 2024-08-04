@@ -1,9 +1,11 @@
 import serial
+import serial.tools.list_ports
 import logging
+import time
 
 
 class SerialHandler():
-    def __init__(self, comport: str='COM4', baudrate: int=115200):
+    def __init__(self):
         """Initalizes the serial port on the computer to talk to the arduino
 
         Args:
@@ -21,8 +23,59 @@ class SerialHandler():
         self.logger.addHandler(console_handler)
         
         # Setup the serial port
+        baudrate = 115200
+        comport = self.find_arduino_com_port()
         self.ser = serial.Serial(comport, baudrate, timeout=0.1)         # 1/timeout is the frequency at which the port is read
         self.ser.reset_input_buffer()  # Clear the input buffer
+        
+    def find_arduino_com_port(self) -> str:
+        """Searches all com ports to find arduino and returns name of port
+        
+        The arduino responds to the command "3\n" with "AlpenFlow" confirming
+        that it is the arduino running the correct firmware.
+
+        Returns:
+            str: ex. "COM4"
+        """
+        possible_ports = []
+        # Initial pass through of potential ports
+        for port in serial.tools.list_ports.comports():
+            if "Arduino" in port.description:
+                possible_ports.append(port.device)
+
+        if len(possible_ports) == 0:
+            self.logger.error("No Arduino found")
+            raise LookupError("No Arduino found")
+        
+        else:
+            # iterate through each port looking for confirmation from arduino
+            for port in possible_ports:
+                buffer = bytearray()  # Buffer to store incoming bytes
+                start_time = time.time()
+                timeout_duration = 2  # seconds
+                self.logger.info("Arduino found at: " + port)
+                test_ser = serial.Serial(port, 115200, timeout=0.5)
+                test_ser.reset_input_buffer()  # Clear the input buffer
+                test_ser.write("3\n".encode())
+            
+                while True:
+                    if time.time() - start_time > timeout_duration:
+                        print("Did not get confirmation from port: " + port)
+                        break
+                    
+                    # Read bytes from the serial port
+                    if test_ser.in_waiting > 0:
+                        test_ser.write("3\n".encode())  # spam identification command
+                        data = test_ser.read(test_ser.in_waiting)
+                        buffer.extend(data)
+                        
+                        if b"AlpenFlow" in buffer:
+                            self.logger.info("Got Confirmation from port: " + port)
+                            return port
+                
+            self.logger.warning("Didn't explicitly find Arduino. Attempting port " + possible_ports[0])
+            test_ser.close()
+            return possible_ports[0]
 
     def get_arduino_data(self) -> int:
         """Get the serial data transmitted by the arduino
@@ -59,7 +112,7 @@ class SerialHandler():
 
 if __name__ == '__main__':
 
-    ser = SerialHandler('COM4', 115200) # COM port, Baudrate
+    ser = SerialHandler() # COM port, Baudrate
     count = 0
     while True:
         data = ser.get_arduino_data()
