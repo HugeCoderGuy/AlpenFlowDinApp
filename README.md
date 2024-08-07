@@ -31,7 +31,6 @@ This din setup requires these peices of hardware:
 ### Installation
 The dependencies for this application can be handled with 
 
-# TODO Add requirements and make sure this is right
 ```
 pip install -r requirements.tt
 ```
