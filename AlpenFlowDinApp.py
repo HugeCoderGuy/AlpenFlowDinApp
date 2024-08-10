@@ -32,7 +32,7 @@ class AlpenFlowApp(QMainWindow):
         # kick off the UI
         super().__init__()
         self.setWindowTitle("AlpenFlow Din Measurement App")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1000, 635)
         
         self.log_dir = os.path.join(os.path.normpath(os.getcwd() + os.sep), "Data")
             
@@ -99,7 +99,7 @@ class AlpenFlowApp(QMainWindow):
         
         # Add the combo box to select din test
         self.combo_box = QComboBox()
-        self.combo_box.addItems(["Testing Mz \u2192", "Testing My \u2191"])  # TODO add color to text
+        self.combo_box.addItems(["Testing Mz \u2192  ", "Testing My \u2191  "])  # TODO add color to text
         self.combo_box.currentIndexChanged.connect(self.on_option_change)
         top_buttons.addWidget(self.combo_box)
         
@@ -185,7 +185,7 @@ class AlpenFlowApp(QMainWindow):
         # self.table_of_counts.setMaxColumnCount(20)
         self.table_of_counts.setHorizontalHeaderLabels(["1mm", "2mm", "3mm", "4mm", "5mm", "6mm", "7mm", "8mm", "9mm", "10mm"])
         for i in range(10):
-            self.table_of_counts.setColumnWidth(i, 95)
+            self.table_of_counts.setColumnWidth(i, 94)
         self.populate_distance_times_table(self.distances)
         # fake_data = np.linspace(0, 10)
         # self.table_of_counts.commitData(fake_data)
@@ -272,9 +272,7 @@ class AlpenFlowApp(QMainWindow):
         self.aggregate_dist, self.aggregate_force = descrete_dist_to_corresponding_force(self.distances, self.forces)
         
         # calculate the din values depending on test state
-        print(self.forces.argmax())
-        print(self.forces.max())
-        print(self.distances)
+
         force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
         if self.testing_My:
             iso13_din = self.iso13.calc_z_of_My_div_BSL(force_per_bsl)
