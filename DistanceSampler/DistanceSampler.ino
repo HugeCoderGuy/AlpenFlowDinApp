@@ -12,11 +12,23 @@
 
 // Components.
 VL53L4CD dist_sensor(&DEV_I2C, A1);
-int My_Pin = D8;
-int Mz_Pin = D7;
+int My_Pin = 8;
+int Mz_Pin = 7;
 int LED_PIN = 13;
 
 bool testing_my = false;
+
+const int numb_samples = 5;
+int samples[numb_samples] = {0, 0, 0, 0, 0};
+int indexer = 0;
+
+byte average() {
+  int res=0;
+  for (int i=0; i<numb_samples; i++) {
+    res += samples[i];
+  }
+  return res/numb_samples;
+}
 
 /* Setup ---------------------------------------------------------------------*/
 void SetupMy(bool My) {
@@ -33,20 +45,21 @@ void SetupMy(bool My) {
   else {
     digitalWrite(My_Pin, HIGH);
     digitalWrite(Mz_Pin, LOW);
-    testing_my = false
+    testing_my = false;
   }
-  delay(10)  // Allow sensor to power up
+  delay(10);  // Allow sensor to power up
   
   // Configure VL53L4CD satellite component.
   dist_sensor.begin();
 
   // Program the highest possible TimingBudget, without enabling the
   // low power mode. This should give the best accuracy
-  dist_sensor.VL53L4CD_SetRangeTiming(200, 0);
+  dist_sensor.VL53L4CD_SetRangeTiming(10, 0);
 
   // Start Measurements
-  dist_sensor.VL53L4CD_StartRanging();
   dist_sensor.InitSensor();
+
+  dist_sensor.VL53L4CD_StartRanging();
 
 }
 
@@ -76,7 +89,6 @@ void setup()
 {
   // Initialize serial for output.
   Serial.begin(115200);
-  Serial.println("Starting...");
 
   pinMode(LED_PIN, OUTPUT);
 
@@ -85,7 +97,7 @@ void setup()
 
   // Default to the My axis test
   SetupMy(true);
-  digitalWrite(LED_PIN), HIGH);  // indicate My mode
+  digitalWrite(LED_PIN, HIGH);  // indicate My mode
 
   
   unsigned long StartTime = millis();
@@ -93,14 +105,15 @@ void setup()
 
 void loop()
 {
-  // Check Serial input to see if user requests changing test axis
-  set_sensor_state();
-  
   uint8_t NewDataReady = 0;
   VL53L4CD_Result_t results;
   uint8_t status;
   char report[64];
-
+  byte measurement;
+  
+  // Check Serial input to see if user requests changing test axis
+  set_sensor_state();
+  
   // Wait for sensor to make measurement
   do {
     status = dist_sensor.VL53L4CD_CheckForDataReady(&NewDataReady);
@@ -112,19 +125,21 @@ void loop()
 
     // Read measured distance. RangeStatus = 0 means valid data
     dist_sensor.VL53L4CD_GetResult(&results);
-    snprintf(report, sizeof(report), "Status = %3u, Distance = %5u mm, Signal = %6u kcps/spad\r\n",
-             results.range_status,
-             results.distance_mm,
-             results.signal_per_spad_kcps);
-    Serial.print(report);
-    Serial.print(millis() - StartTime);
-    Serial.print("\r\n");
-    StartTime = millis();
-
-    // If good data, send it to the python app
-    if (!(results.range_status)) {
-      Serial.print(results.distance_mm);
-      Serial.print('\r\n');
+    if (results.distance_mm > 255) {
+      measurement = 254;
     }
+    else {
+      measurement = results.distance_mm;
+    }
+    if (measurement == 0) {
+      // handle bad measurement (0) with last measurement
+      measurement = samples[indexer];
+    }
+    samples[indexer] = measurement;
+    indexer += 1;
+    if (indexer == numb_samples) {
+      indexer = 0;
+    }
+    Serial.write(average());
   }
 }
