@@ -14,7 +14,12 @@ import time
 from src.AggregateRawData import descrete_dist_to_corresponding_force
 from src.ISO_11088 import ISO11088
 from src.ISO_13992 import ISO13992
-import breeze_resources
+try:
+    import breeze_resources
+    darkmode = True
+except:
+    print("Will not be using the darkmode rendering")
+    darkmode = False
 
 
 class AlpenFlowApp(QMainWindow):
@@ -467,12 +472,12 @@ class AlpenFlowApp(QMainWindow):
 # entry point of application
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    # TODO this code doesn't work
-    file = QFile(":/dark/stylesheet.qss")
-    file.open(QFile.ReadOnly | QFile.Text)
-    stream = QTextStream(file)
-    app.setStyleSheet(stream.readAll())
-        
+    
+    if darkmode:
+        file = QFile(":/dark/stylesheet.qss")
+        file.open(QFile.ReadOnly | QFile.Text)
+        stream = QTextStream(file)
+        app.setStyleSheet(stream.readAll())
         
     mainWin = AlpenFlowApp()
     mainWin.show()
