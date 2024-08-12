@@ -28,6 +28,8 @@ This din setup requires these peices of hardware:
 * x2 ST VL53L4CD TOF sensors
 * A nifty DIN setup the AlpenFlow guys made
 
+With the current configurations, digital pin 7 is used to turn on TOF sensor for Mz and digital pin 8 is for TOF sensor on the My axis. 
+
 ### Installation
 The dependencies for this application can be handled with 
 
@@ -39,7 +41,21 @@ The application can be initiated with
 python AlpenFlowDinApp.py
 ```
 
-### Acknowledgments
+## Data Processing Notes
+Below are a series of notes that are important for user understanding of how the data is processed:
+
+<b>First</b>, he data from the TOF sensor is discrete mm measurements. Of course these are noisy when being sampled at 100Hz (status quo). To counteract that, a moving average is reported by the micro noting the average of the last n values. To adjust the number of values in the moving average, refer to this code in the .ino file
+```
+const int numb_samples = 2;
+int samples[numb_samples] = {0, 0};
+```
+Example change to 4 sample moving average would be setting `numb_samples = 4` and `samples[numb_samples] = {0, 0, 0, 0}`. 
+
+<b>Second</b>, the python code processes the distances and forces data once it breaks from its sampling window after it has recieved n samples greater than 10mm of travel. Since the TOF sensor doesn't discriminate between .1mm and .9mm, I use an averaging algorithm for the displayed release curve. This averaging algorithm for distance x takes the second half of force measurements with x-1 and averages them with the first half of x force measurements. Assuming we have a constant boot release speed (which is part of the din standard), we are effectively saying that the force at 2mm is the average of all sampled forces between distances 1.5mm and 2mm. This <u>assumption is only valid of the release speed is constant.</u> To help improve the consistency of the release speed, the amount of time spent at each displacement is displayed in the tabluar view. 
+
+To handle the instances when distance x isn't sampled, the algorithm just takes the mean of samples at distance x + 1mm. Ultametly though, the save data button saves both the processed and raw data enabling the user to do their own post processing as they see fit. 
+
+## Acknowledgments
 Major kudos go out to the AlpenFlow engineers, Steven and Jesse, for providing their input durring this development and providing extremely thorough documentation of requirements!
 
 Here's another image of the GUI running for yucks
