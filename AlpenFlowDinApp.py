@@ -18,7 +18,7 @@ import breeze_resources
 
 
 class AlpenFlowApp(QMainWindow):
-    def __init__(self, com_port: str='COM4'):
+    def __init__(self):
         
         # Setup the internal logger
         self.logger = logging.getLogger(__name__)
@@ -44,16 +44,16 @@ class AlpenFlowApp(QMainWindow):
         self.iso13 = ISO13992()
         self.iso11 = ISO11088()
         
-        # self.phidget = PhidgetHandler()
+        # self.phidget = PhidgetHandler()  # TODO UNCOMMNET THIS
         self.phidget = None
         try:
-            self.serial = SerialHandler(com_port, 115200) # 1/timeout is the frequency at which the port is read
+            self.serial = SerialHandler() # 1/timeout is the frequency at which the port is read
         except:
             self.logger.error("Did not find Arduino on a USB port")
             self.serial = None
 
         # Various shared variables
-        self.max_index = 12000  # max data collection of 2 mins
+        self.max_index = 3000  # max data collection of 2 mins
         self.curr_data_i = 0
         self.max_data_count = 0
         # use preinitalized arrays for increased speed
@@ -85,7 +85,7 @@ class AlpenFlowApp(QMainWindow):
         Parent layout (main_layout) is vertical
             * Top bar layout is horizontal (top_buttons)
             * Plot and controls are horizontal (plot_and_buttons)
-                * buttons to right of plot are vertical sub layout (button_layout)
+            * buttons to right of plot are vertical sub layout (button_layout)
             * Table displaying times at each displacement is last item (main_layout)
         """
         main_widget = QWidget()
@@ -99,7 +99,7 @@ class AlpenFlowApp(QMainWindow):
         
         # Add the combo box to select din test
         self.combo_box = QComboBox()
-        self.combo_box.addItems(["Testing Mz \u2192  ", "Testing My \u2191  "])  # TODO add color to text
+        self.combo_box.addItems(["Testing My \u2191  ", "Testing Mz \u2192  "])  # TODO add color to text
         self.combo_box.currentIndexChanged.connect(self.on_option_change)
         top_buttons.addWidget(self.combo_box)
         
@@ -165,11 +165,6 @@ class AlpenFlowApp(QMainWindow):
         button_layout.addWidget(self.estimated_speed_lbl)
         
         plot_and_buttons.addLayout(button_layout)
-        self.multiplier = 1
-        
-        # checkbox_layout = QHBoxLayout()
-        # self.save_graphs_button = QLabel(": ")
-        # checkbox_layout.addWidget(self.save_graphs_button)
         
         # Add ability to keep graphs visible or to ignore them
         self.save_graph_checkbox = QCheckBox()
@@ -179,16 +174,12 @@ class AlpenFlowApp(QMainWindow):
         self.table_of_counts = QTableWidget()
         self.table_of_counts.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.table_of_counts.resizeColumnsToContents()
-        # self.table_of_counts.setFixedHeight(50)
         self.table_of_counts.setRowCount(1)
         self.table_of_counts.setColumnCount(10)
-        # self.table_of_counts.setMaxColumnCount(20)
         self.table_of_counts.setHorizontalHeaderLabels(["1mm", "2mm", "3mm", "4mm", "5mm", "6mm", "7mm", "8mm", "9mm", "10mm"])
         for i in range(10):
-            self.table_of_counts.setColumnWidth(i, 94)
+            self.table_of_counts.setColumnWidth(i, 90)
         self.populate_distance_times_table(self.distances)
-        # fake_data = np.linspace(0, 10)
-        # self.table_of_counts.commitData(fake_data)
         main_layout.addWidget(self.table_of_counts)
         
         self.original_style = self.din_value_13.styleSheet()
@@ -204,41 +195,16 @@ class AlpenFlowApp(QMainWindow):
         if not self.saved_the_data:
             self.logger.info("Data that was previously collected is no longer in memory")
             self.saved_the_data = False
-        
-    def clear_scatter(self):
-        """Handles transition between multiple plot overlay and raw data overlay
-        
-        The save graphs checkbox determines if this funct is to be used
-        """
-        # TODO THIS FUNTION IS UNUSED
-        self.ax.clear()
-        self.ax.plot(self.aggregate_dist, self.aggregate_force, label="Run " + str(self.graph_numb))
-        self.ax.set_title("Force vs. Distance Curve")
-        self.ax.set_xlabel("Distance (mm)")
-        self.ax.set_ylabel("Force (N)")
-        self.graph_numb += 1
-        if self.save_graph_checkbox.isChecked():
-            self.ax.legend()
-
-        self.plot_widget.draw()
-        
-    # def sample_sensors(self):
-    #     distance_measurement = self.serial.get_arduino_data()
-    #     if distance_measurement != None:
-    #         self.forces[self.curr_data_i] = self.phidget.recent_measurement
-    #         self.distances[self.curr_data_i] = distance_measurement
-    #         if len(np.where(self.distances > 10, self.distances)) > 10:
-    #             # Stop data collection after 10 data samples greater than 10
-    #             pass
     
     def initalize_data_collection(self):
         """Disables buttons durring data collection and begins Worker
         
         Worker is a thread that collects the data. Defined as a Qthread class
         """
+        # Disable data and output message
         self.combo_box.setEnabled(False)
         self.save_data_button.setEnabled(False)
-        self.begin_data_button.setText("Collecting Data...")
+        self.begin_data_button.setText("Collecting Data for 30s...")
         self.begin_data_button.setEnabled(False)
         self.begin_data_button.setStyleSheet("background-color: yellow")
         self.reset_data()
@@ -265,45 +231,59 @@ class AlpenFlowApp(QMainWindow):
 
         # unpack the worker results and analyze them
         self.distances, self.forces = result
-        estimated_speed = self.derive_speed_from_distances(self.distances)
-        # self.forces = self.phidget.interpret_voltage_data(self.forces)
-        max_force = self.forces.max()
-        self.max_strain_dist = self.distances[self.forces.argmax()]
-        self.aggregate_dist, self.aggregate_force = descrete_dist_to_corresponding_force(self.distances, self.forces)
         
-        # calculate the din values depending on test state
+        if np.any(self.distances) and np.any(self.forces):
+            # only process data if there is data. No data is all 0s
+            mask = (self.distances < 11) & (self.distances >= 0)
+            self.distances = self.distances[mask]
+            self.forces = self.forces[mask]
+            estimated_speed = self.derive_speed_from_distances(self.distances)
 
-        force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
-        if self.testing_My:
-            iso13_din = self.iso13.calc_z_of_My_div_BSL(force_per_bsl)
-            iso11_din = self.iso11.calc_z_of_My_div_BSL(force_per_bsl)
+            # pick out key metrics here
+            # self.forces = self.phidget.interpret_voltage_data(self.forces)
+            max_force = self.forces.max()
+            self.max_strain_dist = self.distances[self.forces.argmax()]
+            self.aggregate_dist, self.aggregate_force = descrete_dist_to_corresponding_force(self.distances, self.forces)
+            dist_print_msg = [int(i) for i in self.aggregate_dist]
+            force_print_msg = [float(i) for i in self.aggregate_force]
+            self.logger.info(f"aggregate_dist:\t{dist_print_msg}")
+            self.logger.info(f"aggregate_force:\t{force_print_msg}")
+            
+            # calculate the din values depending on test state
+            force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
+            if self.testing_My:
+                iso13_din = self.iso13.calc_z_of_My_div_BSL(force_per_bsl)
+                iso11_din = self.iso11.calc_z_of_My_div_BSL(force_per_bsl)
+            else:
+                iso13_din = self.iso13.calc_z_of_Mz_div_BSL(force_per_bsl)
+                iso11_din = self.iso11.calc_z_of_Mz_div_BSL(force_per_bsl)
+            
+            # add data to GUI labels for user to read
+            self.peak_my_label.setText(self.peak_torque_str + str(force_per_bsl) + "N")
+            self.max_force_at.setText(self.max_force_at_str + str(self.max_strain_dist) + "mm")
+            self.din_value_13.setText(self.din_13_str + "<b>" + str(iso13_din) + "</b>") 
+            self.din_value_11.setText(self.din_11_str + "<b>" + str(iso11_din) + "</b>")  
+            self.estimated_speed_lbl.setText(self.estimated_speed_str + str(estimated_speed) + "m/s")
+            
+            self.populate_distance_times_table(self.distances)  # update speeds table
+            
+            # create the release curve plot for viewing
+            if not self.save_graph_checkbox.isChecked():
+                self.ax.clear()
+                self.graph_numb = 0
+                self.ax.scatter(self.distances, self.forces, alpha=.3, linewidths=.3)
+            self.ax.plot(self.aggregate_dist, self.aggregate_force, label="Run " + str(self.graph_numb))
+            self.ax.set_title("Force vs. Distance Curve")
+            self.ax.set_xlabel("Distance (mm)")
+            self.ax.set_ylabel("Force (N)")
+            self.graph_numb += 1
+            if self.save_graph_checkbox.isChecked():
+                self.ax.legend()
+
+            self.plot_widget.draw()
+            
         else:
-            iso13_din = self.iso13.calc_z_of_Mz_div_BSL(force_per_bsl)
-            iso11_din = self.iso11.calc_z_of_Mz_div_BSL(force_per_bsl)
-        
-        # add data to GUI labels for user to read
-        self.peak_my_label.setText(self.peak_torque_str + str(force_per_bsl) + "N")
-        self.max_force_at.setText(self.max_force_at_str + str(self.max_strain_dist) + "mm")
-        self.din_value_13.setText(self.din_13_str + "<b>" + str(iso13_din) + "</b>") 
-        self.din_value_11.setText(self.din_11_str + "<b>" + str(iso11_din) + "</b>")  
-        self.estimated_speed_lbl.setText(self.estimated_speed_str + str(estimated_speed) + "m/s")
-        
-        self.populate_distance_times_table(self.distances)  # update speeds table
-        
-        # create the release curve plot for viewing
-        if not self.save_graph_checkbox.isChecked():
-            self.ax.clear()
-            self.graph_numb = 0
-            self.ax.scatter(self.distances, self.forces, alpha=.3, linewidths=.3)
-        self.ax.plot(self.aggregate_dist, self.aggregate_force, label="Run " + str(self.graph_numb))
-        self.ax.set_title("Force vs. Distance Curve")
-        self.ax.set_xlabel("Distance (mm)")
-        self.ax.set_ylabel("Force (N)")
-        self.graph_numb += 1
-        if self.save_graph_checkbox.isChecked():
-            self.ax.legend()
-
-        self.plot_widget.draw()
+            self.logger.error("Data collection failed")
         
     def task_finished(self):
         """Renables all of the other functions of the GUI after data collection"""
@@ -370,19 +350,17 @@ class AlpenFlowApp(QMainWindow):
             self.distances = np.zeros(parent.max_index)
             self.forces = np.zeros(parent.max_index)
             
-        def run(self):
-            time.sleep(2)
-            index = 10
-            multiplier = np.random.random() * 100
-            self.distances = np.random.randint(0, 11, size=20)
-            self.distances = np.sort(self.distances)
-            # self.distances = np.linspace(0, self.self.max_index)
-            self.forces = np.linspace(0, 20) * multiplier
-            estimated_speed = 1
-            self.result.emit((self.distances[:index], self.forces[:index]))
-            self.finished.emit()
+            # Setup the internal logger
+            self.logger = logging.getLogger(__name__)
+            self.logger.setLevel(logging.INFO)
+            console_handler  = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            console_handler.setFormatter(formatter)
+            
+            self.logger.addHandler(console_handler)
 
-        def actual_run(self) -> tuple:
+        def run(self) -> tuple:
             """Continiously collects data from sensors until boot moves too far away
             
             Function runs as a thread. It samples at the same frequency as the 
@@ -397,8 +375,10 @@ class AlpenFlowApp(QMainWindow):
             index = 0  # tracks location in numpy arrays for dist/force
             dist_counter = 0  # force function end after 10 instances of boot gone
             first_dist = False
-            # stop data collection if we have several points > 10 or run too long
-            while (index < self.self.max_index) and dist_counter < 10:
+            self.self.serial.reset_buffer()
+            
+            # Collect data for 30s or until we have 200ms of too far of dists 
+            while (index < self.self.max_index) and dist_counter < 20:
                 # get the arduino distance measurement to log or synchronize
                 distance_measurement = self.self.serial.get_arduino_data()
                 if distance_measurement != None:
@@ -406,42 +386,43 @@ class AlpenFlowApp(QMainWindow):
                     if not first_dist:
                         first_dist = distance_measurement
                     # since arduino reported data, we get phidget data and log it
-                    self.forces[index] = self.phidget.recent_measurement
+                    self.forces[index] = index
+                    # self.forces[index] = self.phidget.recent_measurement
                     self.distances[index] = distance_measurement - first_dist
                     index += 1
                     if (distance_measurement - first_dist) > 11:
                         dist_counter += 1
+                        
+                    # distance is constrained by byte of range
+                    if first_dist > 240:
+                        self.logger.warning("The Boot is too far away from the sensor. 240mm is the maximum distance.")
+                        self.distances = np.zeros(self.self.max_index)
+                        self.forces = np.zeros(self.self.max_index)
+                        break
             
-            # .002m over n seconds minus 1/100 seconds per sample * 10 -> (.1)
             self.result.emit((self.distances[:index], self.forces[:index]))
             self.finished.emit()
-        
-        # mz_arm_layout = QHBoxLayout()
-        # mz_arm_layout.setSpacing(2)  # Set spacing between the widgets
-        # lever_arm = QLabel("Mz Arm:")
-        # mz_arm_layout.addWidget(lever_arm)
-        # self.mz_arm_layout = QLineEdit("430")
-        # self.mz_arm_layout.setFixedWidth(50)
-        # mz_arm_layout.addWidget(self.mz_arm_layout)
-        # mm_label = QLabel("mm")
-        # mz_arm_layout.addWidget(mm_label)
-        
-        # button_layout.addLayout(mz_arm_layout)
-
 
     def on_option_change(self):
-        # Handle combo box option change
-        if "Mz" in self.combo_box.currentText():
-            self.testing_My = False
-            self.combo_box.setStyleSheet("background-color: light blue")
-        if "My" in self.combo_box.currentText():
-            self.testing_My = True
-            self.combo_box.setStyleSheet("background-color: light green")
-
-        self.logger.info(f"Option changed to {self.combo_box.currentText()}")
+        """Changes the state of the Arduino based on the selected option
         
+        LED L is turned on when in state My. Upon state change, the Ard is queried
+        until a confirmation response is found
+        """
+        if "Mz" in self.combo_box.currentText():
+            self.serial.set_mz_state()
+            self.testing_My = False
+            self.combo_box.setStyleSheet(self.original_style)
+            self.logger.info(f"Option changed to {self.combo_box.currentText()}")
+
+        if "My" in self.combo_box.currentText():
+            self.serial.set_my_state()
+            self.testing_My = True
+            self.combo_box.setStyleSheet(self.original_style)
+            self.logger.info(f"Option changed to {self.combo_box.currentText()}")
         
     def save_data(self):
+        """Saves the dist/force data in memory to two csvs. Processed and raw"""
         f_name = self.csv_name_input.text() + ".csv"
         f_graphed_name = self.csv_name_input.text() + "_graphed" + ".csv"
         csv_fname = os.path.join(self.log_dir, f_name)
@@ -459,13 +440,12 @@ class AlpenFlowApp(QMainWindow):
             return
         else:
             # Stack the arrays column-wise
-            print(self.distances, "\n", self.forces)
             data = np.column_stack((self.distances, self.forces))
             graphed_data = np.column_stack((self.aggregate_dist, self.aggregate_force))
 
             # Save to CSV
-            np.savetxt(csv_fname, data, delimiter=',', header='Distance[mm],Force[N]')
-            np.savetxt(csv_graphed_name, data, delimiter=',', header='Distance[mm],Force[N]')
+            np.savetxt(csv_fname, data, delimiter=',', header='Distance[mm],Force[N]', fmt='%.4f')
+            np.savetxt(csv_graphed_name, graphed_data, delimiter=',', header='Distance[mm],Force[N]', fmt='%.4f')
             
             self.logger.info("Saved data to:\n\t" + csv_fname + " and \n\t" + csv_graphed_name)
             
@@ -479,7 +459,7 @@ class AlpenFlowApp(QMainWindow):
         self.saved_the_data = True
 
     def revert_color(self):
-        # Revert the button color to the original style
+        """Revert the button color to the original style"""
         self.save_data_button.setStyleSheet(self.original_style)
         self.save_data_button.setText("Save Data")
         self.csv_name_input.setText("Din_data_" + datetime.now().strftime("%Y%m%d_%H%M"))

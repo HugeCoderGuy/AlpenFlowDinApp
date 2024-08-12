@@ -23,10 +23,14 @@ class SerialHandler():
         self.logger.addHandler(console_handler)
         
         # Setup the serial port
+        self.timeout_duration = 2  # seconds
         baudrate = 115200
         comport = self.find_arduino_com_port()
         self.ser = serial.Serial(comport, baudrate, timeout=0.1)         # 1/timeout is the frequency at which the port is read
-        self.ser.reset_input_buffer()  # Clear the input buffer
+        self.reset_buffer() # Clear the input buffer
+        
+    def reset_buffer(self) -> None:
+        self.ser.reset_input_buffer()
         
     def find_arduino_com_port(self) -> str:
         """Searches all com ports to find arduino and returns name of port
@@ -52,14 +56,13 @@ class SerialHandler():
             for port in possible_ports:
                 buffer = bytearray()  # Buffer to store incoming bytes
                 start_time = time.time()
-                timeout_duration = 2  # seconds
                 self.logger.info("Arduino found at: " + port)
                 test_ser = serial.Serial(port, 115200, timeout=0.5)
                 test_ser.reset_input_buffer()  # Clear the input buffer
                 test_ser.write("3\n".encode())
             
                 while True:
-                    if time.time() - start_time > timeout_duration:
+                    if time.time() - start_time > self.timeout_duration:
                         print("Did not get confirmation from port: " + port)
                         break
                     
@@ -90,20 +93,67 @@ class SerialHandler():
         else:
             return None
             
-    def set_mz_state(self) -> None:
+    def set_my_state(self) -> None:
         """Tell the Arduino to use the Mz distance sensor
         """
-        self.ser.write("1\n".encode())
-        self.logger.info(self.ser.readline().decode())
+        start_time = time.time()
+        buffer = bytearray()  # Buffer to store incoming bytes
+
+        # self.ser.reset_input_buffer()
+        while True:
+            if time.time() - start_time > self.timeout_duration:
+                print("Did not get confirmation for switch to My testing")
+                break
+            
+            # Read bytes from the serial port
+            if self.ser.in_waiting > 0:
+                self.ser.write("1\n".encode())  # spam identification command
+                data = self.ser.read(self.ser.in_waiting)
+                buffer.extend(data)
+                
+                if b"my" in buffer:
+                    self.logger.info("Arduino confirmed switch to My")
+                    break
+                if b"ym" in buffer:
+                    self.logger.info("Arduino is already in state my")
+                    break
+        # try:
+        #     self.logger.info(f"msg from arduino: {self.ser.readline().decode()}")
+        # except:
+        #     self.logger.info(f"msg from arduino: {self.ser.readline().decode()}")
         # Alternative option is ser.write(byte_value.to_bytes(1, byteorder='big'))
         # w/ this on the recieve end uint8_t receivedByte = Serial.read(); // Read the incoming byte
         return None
         
-    def set_my_state(self) -> None:
+    def set_mz_state(self) -> None:
         """Set the Arduino to use the My distance sensor
         """
+        start_time = time.time()
+        buffer = bytearray()  # Buffer to store incoming bytes
         self.ser.write("2\n".encode())
-        self.logger.info(self.ser.readline().decode())
+        
+        while True:
+            if time.time() - start_time > self.timeout_duration:
+                print("Did not get confirmation for switch to Mz testing")
+                break
+            
+            # Read bytes from the serial port
+            if self.ser.in_waiting > 0:
+                self.ser.write("2\n".encode())  # spam identification command
+                data = self.ser.read(self.ser.in_waiting)
+                buffer.extend(data)
+                
+                if b"mz" in buffer:
+                    self.logger.info("Arduino confirmed switch to Mz")
+                    break
+                if b"zm" in buffer:
+                    self.logger.info("Arduino is already in state mz")
+                    break
+        # self.ser.reset_input_buffer()
+        # try:
+        #     self.logger.info(f"msg from arduino: {self.ser.readline().decode()}")
+        # except:
+        #     self.logger.info(f"msg from arduino: {self.ser.readline().decode()}")
         return None
         
 
@@ -114,16 +164,23 @@ if __name__ == '__main__':
 
     ser = SerialHandler() # COM port, Baudrate
     count = 0
+    time.sleep(1)
+    ser.set_my_state()
     while True:
         data = ser.get_arduino_data()
-        print(data)
+        if data != None:
+            print(data)
         
-        # count += 1
-        # if count == 10:
-        #     ser.set_mz_state()
+        count += 1
+        if count == 1000000:
+            print(count)
+            print("switching state to mz")
+            ser.set_mz_state()
         
-        # if count == 20:
-        #     ser.set_my_state()
-        #     count = 0
+        if count == 2000000:
+            print("switching state to my")
+
+            ser.set_my_state()
+            count = 0
         
 

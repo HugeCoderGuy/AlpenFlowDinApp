@@ -18,9 +18,9 @@ int LED_PIN = 13;
 
 bool testing_my = false;
 
-const int numb_samples = 5;
-int samples[numb_samples] = {0, 0, 0, 0, 0};
-int indexer = 0;
+const int numb_samples = 2;
+int samples[numb_samples] = {0, 0};
+volatile int indexer = 0;
 
 byte average() {
   int res=0;
@@ -43,8 +43,8 @@ void SetupMy(bool My) {
     testing_my = true;
   }
   else {
-    digitalWrite(My_Pin, HIGH);
-    digitalWrite(Mz_Pin, LOW);
+    digitalWrite(My_Pin, LOW);
+    digitalWrite(Mz_Pin, HIGH);
     testing_my = false;
   }
   delay(10);  // Allow sensor to power up
@@ -72,12 +72,21 @@ void set_sensor_state() {
     int input = Serial.parseInt(); // Read the integer from the serial buffer
     
     if ((input == 1) and !(testing_my)) {
+      delay(5);
+      Serial.println("my");  
       SetupMy(true);
       digitalWrite(LED_PIN, HIGH);
     }
+    else if ((input == 1) and testing_my) {
+      Serial.println("ym");  // confirmation that we are in my state
+    }
     else if ((input == 2) and testing_my) {
+      Serial.println("mz");
       SetupMy(false);
       digitalWrite(LED_PIN, LOW);
+    }
+    else if ((input == 2) and !testing_my) {
+      Serial.println("zm"); // confirmation that we are already in this state
     }
     else if (input == 3) {
       Serial.println("AlpenFlow");
@@ -91,6 +100,9 @@ void setup()
   Serial.begin(115200);
 
   pinMode(LED_PIN, OUTPUT);
+  pinMode(My_Pin, OUTPUT);
+  pinMode(Mz_Pin, OUTPUT);
+
 
   // Initialize I2C bus.
   DEV_I2C.begin();

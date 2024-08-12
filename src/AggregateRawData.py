@@ -1,6 +1,7 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
+import logging
 
 
 def descrete_dist_to_corresponding_force(dist: np.array, force: np.array) -> tuple:
@@ -23,6 +24,15 @@ def descrete_dist_to_corresponding_force(dist: np.array, force: np.array) -> tup
         tuple: distance array, force array for each unique dist value
         between 0 and 10mm
     """
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    console_handler  = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+    
+    logger.addHandler(console_handler)
+    
     unique_dists = np.sort(np.unique(dist))
     aggregate_dist = np.zeros(len(unique_dists))
     aggregate_force = np.zeros(len(unique_dists))
@@ -46,11 +56,19 @@ def descrete_dist_to_corresponding_force(dist: np.array, force: np.array) -> tup
 
         # handle edge case where i == last element
         if i == 1:
-            aggregate_dist[i] = unique_dists[i]
             aggregate_force[i] = np.mean(force[dist_indexes[0]:second_split])
+            aggregate_dist[i] = unique_dists[i]
+            if np.isnan(aggregate_force[i]):
+                logger.info(f"Addressing the Runtime Error by make for sample at dist {unique_dists[i]} = np.mean(force at that dist)")
+                aggregate_force[i] = np.mean(force[dist_indexes])
+                aggregate_dist[i] = unique_dists[i]  
             continue
         aggregate_force[i] = np.mean(force[first_split:second_split])
         aggregate_dist[i] = unique_dists[i]
+        if np.isnan(aggregate_force[i]):
+            logger.info(f"Addressing the Runtime Error by make for sample at dist {unique_dists[i]} = np.mean(force at that dist)")
+            aggregate_force[i] = np.mean(force[dist_indexes])
+            aggregate_dist[i] = unique_dists[i]  
 
     mask = aggregate_dist <= 10
     aggregate_dist = aggregate_dist[mask]
@@ -79,4 +97,4 @@ if __name__ == "__main__":
     ax.set_xlabel("Distance (mm)")
     ax.set_ylabel("Force")
     ax.set_title("Spot Checking Algorithm Against Handmade Data")
-    plt.show()
+    # plt.show()
