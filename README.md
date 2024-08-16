@@ -1,4 +1,4 @@
-# A Ski Binding Data Collection Tool for AlpenFlow Bindings
+# A Ski Binding Data Collection Tool for [AlpenFlow Design](https://www.alpenflowdesign.com/?srsltid=AfmBOoq_nodg2ozLw1kKz-2c_BeYo06hfF1Qi-odZfMAEKACfAORmYSZ)
 by Alex Lewis
 
 ![DINGUI](/img/dinGui.png)
