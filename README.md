@@ -30,11 +30,23 @@ This din setup requires these peices of hardware:
 
 With the current configurations, digital pin 7 is used to turn on TOF sensor for Mz and digital pin 8 is for TOF sensor on the My axis. 
 
+Arduino Pinout to Tof Sensor:
+* Red to Arduino 5V
+* Black to Arduino GRND
+* Yellow to Arduino SCL
+* Blue to Arduino SDA
+
+Then the Tof select from the arduino is controlled using
+* XSHUT of My to Arduino 8
+* XSHUT of Mz to ARduino 7
+
+Refer to `/DistanceSampler/DistanceSampler.ino` for notes on GPIO controlling the Tof sensor in use and ![this link](https://learn.adafruit.com/adafruit-vl53l4cd-time-of-flight-distance-sensor/pinouts) to find adafruit's documentation on the Tof sensor pinout.
+
 ### Installation
 The dependencies for this application can be handled with 
 
 ```
-pip install -r requirements.tt
+pip install -r requirements.txt
 ```
 The application can be initiated with
 ```

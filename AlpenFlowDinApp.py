@@ -49,8 +49,8 @@ class AlpenFlowApp(QMainWindow):
         self.iso13 = ISO13992()
         self.iso11 = ISO11088()
         
-        # self.phidget = PhidgetHandler()  # TODO UNCOMMNET THIS
-        self.phidget = None
+        self.phidget = PhidgetHandler()  # TODO UNCOMMNET THIS
+        # self.phidget = None
         try:
             self.serial = SerialHandler() # 1/timeout is the frequency at which the port is read
         except:
@@ -245,7 +245,7 @@ class AlpenFlowApp(QMainWindow):
             estimated_speed = self.derive_speed_from_distances(self.distances)
 
             # pick out key metrics here
-            # self.forces = self.phidget.interpret_voltage_data(self.forces)
+            self.forces = self.phidget.interpret_voltage_data(self.forces, self.testing_My)
             max_force = self.forces.max()
             self.max_strain_dist = self.distances[self.forces.argmax()]
             self.aggregate_dist, self.aggregate_force = descrete_dist_to_corresponding_force(self.distances, self.forces)
@@ -391,8 +391,8 @@ class AlpenFlowApp(QMainWindow):
                     if not first_dist:
                         first_dist = distance_measurement
                     # since arduino reported data, we get phidget data and log it
-                    self.forces[index] = index
-                    # self.forces[index] = self.phidget.recent_measurement
+                    # self.forces[index] = index
+                    self.forces[index] = self.self.phidget.recent_measurement
                     self.distances[index] = distance_measurement - first_dist
                     index += 1
                     if (distance_measurement - first_dist) > 11:

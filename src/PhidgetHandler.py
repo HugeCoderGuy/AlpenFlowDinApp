@@ -36,17 +36,19 @@ class PhidgetHandler():
         # set callback function to handle new data
         self.ch.setOnVoltageRatioChangeHandler(self.onVoltageRatioChange)
         self.ch.openWaitForAttachment(5000)
-
-        minDataInterval = self.ch.getMinDataInterval()
-        print("Phidget MinDataInterval: " + str(minDataInterval))
-        minDataInterval = self.ch.getMaxDataInterval()
-        print("Phidget MaxDataInterval: " + str(minDataInterval))
-        self.ch.setDataInterval(1000)
-        
-        voltageRatio = self.ch.getVoltageRatio()
-        print("Phidget VOLTERATIO: " + str(voltageRatio))
         
         # self.ch.setBridgeGain(BridgeGain.BRIDGE_GAIN_128)
+
+        # minDataInterval = self.ch.getMinDataInterval()
+        # print("Phidget MinDataInterval: " + str(minDataInterval))
+        # minDataInterval = self.ch.getMaxDataInterval()
+        # print("Phidget MaxDataInterval: " + str(minDataInterval))
+        self.ch.setDataInterval(10)
+        
+        # voltageRatio = self.ch.getVoltageRatio()
+        # print("Phidget VOLTERATIO: " + str(voltageRatio))
+        
+        self.ch.setBridgeGain(BridgeGain.BRIDGE_GAIN_128)
         
     def onVoltageRatioChange(self, other_self, voltageRatio):  # other self is reference to phidget
         """Callback function for phidget device when voltage ratio changes
@@ -63,6 +65,7 @@ class PhidgetHandler():
         self.recent_samples[self.sample_index] = voltageRatio
         self.sample_index ^= 1
         self.recent_measurement = np.mean(self.recent_samples)
+        # print(self.interpret_voltage_data(np.array(self.recent_measurement), True))
         
     def interpret_voltage_data(self, data: np.array, my_data: bool) -> np.array:
         """Takes voltage ratio data from phidget and converts to force in Newtons
@@ -86,3 +89,19 @@ class PhidgetHandler():
     def close(self) -> None:
         self.ch.close()
     
+    
+if __name__ == "__main__":
+    phidget = PhidgetHandler()
+    
+    try:
+        input("press enter to exit")
+    except:
+        pass
+    
+    phidget.close()
+    # forces = []
+    # for i in range(100):
+    #     forces[i] = phidget.recent_measurement
+    #     forces = phidget.interpret_voltage_data(forces)
+ 
+ 

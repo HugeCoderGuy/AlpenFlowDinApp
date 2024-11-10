@@ -1,6 +1,6 @@
 {
     "My": {
-        "gain": 1,
+        "gain": 100,
         "offset": 0,
         "lever_arm": 1
     },
