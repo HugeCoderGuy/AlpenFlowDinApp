@@ -70,7 +70,7 @@ def descrete_dist_to_corresponding_force(dist: np.array, force: np.array) -> tup
             aggregate_force[i] = np.mean(force[dist_indexes])
             aggregate_dist[i] = unique_dists[i]  
 
-    mask = aggregate_dist <= 10
+    mask = aggregate_dist <= 30
     aggregate_dist = aggregate_dist[mask]
     aggregate_force = aggregate_force[mask]
     return (aggregate_dist, aggregate_force)

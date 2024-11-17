@@ -37,7 +37,7 @@ class AlpenFlowApp(QMainWindow):
         # kick off the UI
         super().__init__()
         self.setWindowTitle("AlpenFlow Din Measurement App")
-        self.setGeometry(100, 100, 1000, 635)
+        self.setGeometry(100, 100, 1500, 775)
         
         self.log_dir = os.path.join(os.path.normpath(os.getcwd() + os.sep), "Data")
             
@@ -61,11 +61,12 @@ class AlpenFlowApp(QMainWindow):
         self.max_index = 3000  # max data collection of 2 mins
         self.curr_data_i = 0
         self.max_data_count = 0
+        self.numb_mm_to_measure = 30
         # use preinitalized arrays for increased speed
         self.forces = np.zeros(self.max_index)
         self.distances = np.zeros(self.max_index, dtype=np.uint8)  # maybe specify data type
-        self.aggregate_dist = np.zeros(10)
-        self.aggregate_force = np.zeros(10)
+        self.aggregate_dist = np.zeros(self.numb_mm_to_measure)
+        self.aggregate_force = np.zeros(self.numb_mm_to_measure)
         self.max_strain_dist = 0
         self.max_strain = 0
         self.sample_rate = .01
@@ -142,6 +143,8 @@ class AlpenFlowApp(QMainWindow):
         plot_and_buttons.addLayout(plot_layout)
         
         self.ax = self.plot_widget.figure.subplots()  # global ax variable
+        self.plot_widget.setFixedSize(1300, 600) 
+        # self.plot_widget.figure.tight_layout(pad=1.25)
 
         # Add the buttons and value displays
         button_layout = QVBoxLayout()  # buttons are vertical
@@ -180,9 +183,11 @@ class AlpenFlowApp(QMainWindow):
         self.table_of_counts.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.table_of_counts.resizeColumnsToContents()
         self.table_of_counts.setRowCount(1)
-        self.table_of_counts.setColumnCount(10)
-        self.table_of_counts.setHorizontalHeaderLabels(["1mm", "2mm", "3mm", "4mm", "5mm", "6mm", "7mm", "8mm", "9mm", "10mm"])
-        for i in range(10):
+        self.table_of_counts.setColumnCount(self.numb_mm_to_measure)
+        
+        distance_labels = [f"{x + 1}mm" for x in range(self.numb_mm_to_measure)]
+        self.table_of_counts.setHorizontalHeaderLabels(distance_labels)
+        for i in range(self.numb_mm_to_measure):
             self.table_of_counts.setColumnWidth(i, 90)
         self.populate_distance_times_table(self.distances)
         main_layout.addWidget(self.table_of_counts)
@@ -239,7 +244,7 @@ class AlpenFlowApp(QMainWindow):
         
         if np.any(self.distances) and np.any(self.forces):
             # only process data if there is data. No data is all 0s
-            mask = (self.distances < 11) & (self.distances >= 0)
+            mask = (self.distances < self.numb_mm_to_measure) & (self.distances >= 0)
             self.distances = self.distances[mask]
             self.forces = self.forces[mask]
             estimated_speed = self.derive_speed_from_distances(self.distances)
@@ -313,11 +318,15 @@ class AlpenFlowApp(QMainWindow):
         unique_dist = np.unique(distances)
         unique_dist = np.sort(unique_dist)
 
-        for i in range(1, 11):
-            number_samples = np.sum(distances[distances == i])
+        for i in range(1, 31):
+            mask = distances == i
+            number_samples = np.sum(mask)
             durration = self.sample_rate * number_samples
             durration = round(durration, 2)
-            self.table_of_counts.setItem(0, i-1, QTableWidgetItem(str(durration) + "s"))
+            if durration == 0:
+                self.table_of_counts.setItem(0, i-1, QTableWidgetItem(""))
+            else:
+                self.table_of_counts.setItem(0, i-1, QTableWidgetItem(str(durration) + "s"))
 
         
     def derive_speed_from_distances(self, dists: np.array) -> float:
@@ -332,10 +341,12 @@ class AlpenFlowApp(QMainWindow):
         Returns:
             float: speed in meters per second
         """
+        start_dist = 2  #mm
+        end_dist = 10  #mm
         try:
-            numb_distances = np.sum((dists >= 2) & (dists < 10))
+            numb_distances = np.sum((dists >= start_dist) & (dists < end_dist))
             durration = numb_distances * self.sample_rate  # seconds
-            speed = (.01 - .002) / durration  # meters per second
+            speed = ((end_dist - start_dist) * .001) / durration  # meters per second
             return round(speed, 2)
         except ZeroDivisionError:
             self.logger.error("Could not derive speed from distance measurements: \n", dists)
@@ -396,7 +407,7 @@ class AlpenFlowApp(QMainWindow):
                     self.forces[index] = self.self.phidget.recent_measurement
                     self.distances[index] = distance_measurement - first_dist
                     index += 1
-                    if (distance_measurement - first_dist) > 11:
+                    if (distance_measurement - first_dist) > self.self.numb_mm_to_measure + 1:
                         dist_counter += 1
                         
                     # distance is constrained by byte of range

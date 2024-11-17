@@ -50,7 +50,7 @@ pip install -r requirements.txt
 ```
 The application can be initiated with
 ```
-python AlpenFlowDinApp.py
+python3 .\AlpenFlowDinApp.py
 ```
 
 ## Data Processing Notes
