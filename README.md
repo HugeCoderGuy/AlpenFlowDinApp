@@ -67,6 +67,11 @@ Example change to 4 sample moving average would be setting `numb_samples = 4` an
 
 To handle the instances when distance x isn't sampled, the algorithm just takes the mean of samples at distance x + 1mm. Ultametly though, the save data button saves both the processed and raw data enabling the user to do their own post processing as they see fit. 
 
+## Shopping List:
+* [TOF sensor](https://www.adafruit.com/product/5396)
+* [Solder Breadboard](https://www.adafruit.com/product/1608) or a [shield like this](https://learn.adafruit.com/adafruit-proto-shield-arduino/overview)
+* [Arduino Equivalent](https://www.adafruit.com/product/2488)
+
 ## Acknowledgments
 Major kudos go out to the AlpenFlow engineers, Steven and Jesse, for providing their input durring this development and providing extremely thorough documentation of requirements!
 
