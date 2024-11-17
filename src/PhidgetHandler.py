@@ -16,7 +16,7 @@ class PhidgetHandler():
         console_handler.setLevel(logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler)
+        # self.logger.addHandler(console_handler)
         
         # load the calibration data
         with open('load_cell_calibration.json') as f:
@@ -83,7 +83,8 @@ class PhidgetHandler():
         else:
             weights = (data + self.mz_cal['offset']) * self.mz_cal['gain']
             weights *= self.mz_cal['lever_arm']
-        forces = weights * 9.81  # convert to N
+        # forces = weights * 9.81  # convert to N
+        forces = weights  # Handling the force conversion with the phidget UI
         return forces
         
     def close(self) -> None:

@@ -20,7 +20,7 @@ class SerialHandler():
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         console_handler.setFormatter(formatter)
         
-        self.logger.addHandler(console_handler)
+        # self.logger.addHandler(console_handler)
         
         # Setup the serial port
         self.timeout_duration = 2  # seconds

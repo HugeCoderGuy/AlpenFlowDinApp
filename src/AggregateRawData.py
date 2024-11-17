@@ -31,7 +31,7 @@ def descrete_dist_to_corresponding_force(dist: np.array, force: np.array) -> tup
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     console_handler.setFormatter(formatter)
     
-    logger.addHandler(console_handler)
+    # logger.addHandler(console_handler)
     
     unique_dists = np.sort(np.unique(dist))
     aggregate_dist = np.zeros(len(unique_dists))

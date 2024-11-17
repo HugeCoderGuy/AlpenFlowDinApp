@@ -262,6 +262,7 @@ class AlpenFlowApp(QMainWindow):
             else:
                 iso13_din = self.iso13.calc_z_of_Mz_div_BSL(force_per_bsl)
                 iso11_din = self.iso11.calc_z_of_Mz_div_BSL(force_per_bsl)
+            self.logger.info(f"ISO13 {iso13_din}, ISO11: {iso11_din}")
             
             # add data to GUI labels for user to read
             self.peak_my_label.setText(self.peak_torque_str + str(force_per_bsl) + "N")
@@ -363,7 +364,7 @@ class AlpenFlowApp(QMainWindow):
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             console_handler.setFormatter(formatter)
             
-            self.logger.addHandler(console_handler)
+            # self.logger.addHandler(console_handler)
 
         def run(self) -> tuple:
             """Continiously collects data from sensors until boot moves too far away

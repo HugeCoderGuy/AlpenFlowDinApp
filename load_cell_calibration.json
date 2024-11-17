@@ -1,12 +1,12 @@
 {
     "My": {
-        "gain": 100,
-        "offset": 0,
+        "gain": 998591.653418578,
+        "offset": 0.000004231,
         "lever_arm": 1
     },
     "Mz": {
-        "gain": 1,
-        "offset": 0,
+        "gain": 998591.653418578,
+        "offset": 0.000004231,
         "lever_arm": 1
     }
 }
