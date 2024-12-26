@@ -260,6 +260,7 @@ class AlpenFlowApp(QMainWindow):
 
             # pick out key metrics here
             self.boot_torques = self.phidget.interpret_voltage_data(self.boot_torques, self.testing_My)
+            self.raw_torques = self.phidget.interpret_voltage_data(self.raw_torques, self.testing_My)
             BSL = int(self.bsl_input_box.text()) # [mm] Get BSL that the user inputted into the input box. 
             self.boot_torques_div_BSL = self.boot_torques/(BSL/1000) # [N] Normalized boot torque. Note how BSL is coverted to meters
             self.raw_torques_div_BSL = self.raw_torques / (BSL/1000)
@@ -369,7 +370,6 @@ class AlpenFlowApp(QMainWindow):
             durration = numb_distances * sample_rate  # seconds
             speed = (covered_distance * .001) / durration  # meters per second
             angular_speed = np.rad2deg(np.arcsin(covered_distance / int(self.bsl_input_box.text()))) / durration
-            print("DEBUG", np.rad2deg(np.arcsin(covered_distance / int(self.bsl_input_box.text()))), durration)
             return round(speed, 2), round(angular_speed, 4)
         except ZeroDivisionError:
             self.logger.error("Could not derive speed from distance measurements: \n", dists)
