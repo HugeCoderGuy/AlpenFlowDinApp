@@ -1,3 +1,4 @@
+from typing import Tuple
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QComboBox, QLineEdit, QCheckBox, QTableWidget, QTableWidgetItem, QAbstractScrollArea 
 from PyQt5.QtGui import QIntValidator
 from PyQt5.QtCore import QThread, pyqtSignal, QTimer, QFile, QTextStream
@@ -58,24 +59,29 @@ class AlpenFlowApp(QMainWindow):
             self.serial = None
 
         # Various shared variables
-        self.max_index = 3000  # max data collection of 2 mins
+        self.max_index = 1200  # max data collection of 2 mins
+        self.max_raw_torques_index = 50000
         self.curr_data_i = 0
         self.max_data_count = 0
         self.numb_mm_to_measure = 30
         # use preinitalized arrays for increased speed
-        self.forces = np.zeros(self.max_index)
+        self.boot_torques = np.zeros(self.max_index)
+        self.torque_times = np.zeros(self.max_index)
+        self.raw_torques = np.zeros(self.max_raw_torques_index)
+        self.raw_torque_times = np.zeros(self.max_raw_torques_index)
         self.distances = np.zeros(self.max_index, dtype=np.uint8)  # maybe specify data type
         self.aggregate_dist = np.zeros(self.numb_mm_to_measure)
-        self.aggregate_force = np.zeros(self.numb_mm_to_measure)
+        self.aggregate_boot_torques_div_BSL = np.zeros(self.numb_mm_to_measure)
         self.max_strain_dist = 0
         self.max_strain = 0
         self.sample_rate = .01
         
         # this text is used for the results output
-        self.peak_torque_str = "Torque/BSL: \t\t"
+        self.peak_torque_div_BSL_str = "Torque/BSL: \t\t"
         self.din_13_str = "Z value (ISO 13992): \t\t"
         self.din_11_str = "Z value (ISO 11088): \t\t"
         self.estimated_speed_str = "Estimated Speed: \t"
+        self.estimated_angular_speed_str = "Estimated Angle Speed \t"
         self.max_force_at_str = "Max Force at: \t\t"
         
         # logic flags to determine branches
@@ -123,9 +129,9 @@ class AlpenFlowApp(QMainWindow):
         # Add the input box and ability to save current data to a file
         file_name_label = QLabel("\t\t\tFile Name:")
         top_buttons.addWidget(file_name_label)
-        self.csv_name_input = QLineEdit("Din_data_" + datetime.now().strftime("%Y%m%d_%H%M"))
+        self.csv_name_input = QLineEdit(f"Din_data_{self.bsl_input_box.text()}_My_{self.testing_My}" + datetime.now().strftime("%Y%m%d_%H%M"))
         top_buttons.addWidget(self.csv_name_input)
-        self.csv_name_input.setFixedWidth(250)
+        self.csv_name_input.setFixedWidth(350)
         csv_label = QLabel(".csv")
         top_buttons.addWidget(csv_label)
         self.save_data_button = QPushButton("Save Data")
@@ -157,7 +163,7 @@ class AlpenFlowApp(QMainWindow):
         self.original_begin_data_style = self.begin_data_button.styleSheet()
 
         # A series of labels to display relavent measurements
-        self.peak_my_label = QLabel(self.peak_torque_str + "0N")
+        self.peak_my_label = QLabel(self.peak_torque_div_BSL_str + "0N")
         button_layout.addWidget(self.peak_my_label)
         
         self.max_force_at = QLabel(self.max_force_at_str + "0mm")
@@ -171,6 +177,9 @@ class AlpenFlowApp(QMainWindow):
         
         self.estimated_speed_lbl = QLabel(self.estimated_speed_str + "0m/s")
         button_layout.addWidget(self.estimated_speed_lbl)
+        
+        self.estimated_angular_speed_lbl = QLabel(self.estimated_angular_speed_str + "0deg/s")
+        button_layout.addWidget(self.estimated_angular_speed_lbl)
         
         plot_and_buttons.addLayout(button_layout)
         
@@ -200,7 +209,7 @@ class AlpenFlowApp(QMainWindow):
         self.curr_data_i = 0
         self.max_strain_dist = 0
         self.max_strain = 0
-        self.forces = np.zeros(self.max_index)
+        self.boot_torques = np.zeros(self.max_index)
         self.distances = np.zeros(self.max_index, dtype='uint8')  # maybe specify data type
         if not self.saved_the_data:
             self.logger.info("Data that was previously collected is no longer in memory")
@@ -214,7 +223,7 @@ class AlpenFlowApp(QMainWindow):
         # Disable data and output message
         self.combo_box.setEnabled(False)
         self.save_data_button.setEnabled(False)
-        self.begin_data_button.setText("Collecting Data for 30s...")
+        self.begin_data_button.setText("Collecting Data for 12s...")
         self.begin_data_button.setEnabled(False)
         self.begin_data_button.setStyleSheet("background-color: yellow")
         self.reset_data()
@@ -237,44 +246,52 @@ class AlpenFlowApp(QMainWindow):
         # clear the scatter plot data and plot old processed data before new graphs
         if self.save_graph_checkbox.isChecked() and self.graph_numb == 1:
             self.ax.clear()
-            self.ax.plot(self.aggregate_dist, self.aggregate_force, label="Run 0")
+            self.ax.plot(self.aggregate_dist, self.aggregate_boot_torques_div_BSL, label="Run 0")
 
         # unpack the worker results and analyze them
-        self.distances, self.forces = result
+        self.distances, self.boot_torques, self.torque_times, self.raw_torques, self.raw_torque_times = result
         
-        if np.any(self.distances) and np.any(self.forces):
+        if np.any(self.distances) and np.any(self.boot_torques):
             # only process data if there is data. No data is all 0s
             mask = (self.distances < self.numb_mm_to_measure) & (self.distances >= 0)
             self.distances = self.distances[mask]
-            self.forces = self.forces[mask]
-            estimated_speed = self.derive_speed_from_distances(self.distances)
+            self.boot_torques = self.boot_torques[mask]
+            estimated_speed, estimated_angular_speed = self.derive_speed_from_distances(self.distances)
 
             # pick out key metrics here
-            self.forces = self.phidget.interpret_voltage_data(self.forces, self.testing_My)
-            max_force = self.forces.max()
-            self.max_strain_dist = self.distances[self.forces.argmax()]
-            self.aggregate_dist, self.aggregate_force = descrete_dist_to_corresponding_force(self.distances, self.forces)
+            self.boot_torques = self.phidget.interpret_voltage_data(self.boot_torques, self.testing_My)
+            BSL = int(self.bsl_input_box.text()) # [mm] Get BSL that the user inputted into the input box. 
+            self.boot_torques_div_BSL = self.boot_torques/(BSL/1000) # [N] Normalized boot torque. Note how BSL is coverted to meters
+            self.raw_torques_div_BSL = self.raw_torques / (BSL/1000)
+           
+            # max_boot_torque_div_BSL = self.boot_torques_div_BSL.max()  
+            max_boot_torque_div_BSL =  self.raw_torques_div_BSL.max()
+            
+            self.max_strain_dist = self.distances[self.boot_torques.argmax()]
+            self.aggregate_dist, self.aggregate_boot_torques_div_BSL = descrete_dist_to_corresponding_force(self.distances, self.boot_torques_div_BSL)
             dist_print_msg = [int(i) for i in self.aggregate_dist]
-            force_print_msg = [float(i) for i in self.aggregate_force]
+            force_print_msg = [float(i) for i in self.aggregate_boot_torques_div_BSL]
             self.logger.info(f"aggregate_dist:\t{dist_print_msg}")
             self.logger.info(f"aggregate_force:\t{force_print_msg}")
+
             
             # calculate the din values depending on test state
-            force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
+            # force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
             if self.testing_My:
-                iso13_din = self.iso13.calc_z_of_My_div_BSL(force_per_bsl)
-                iso11_din = self.iso11.calc_z_of_My_div_BSL(force_per_bsl)
+                iso13_din = self.iso13.calc_z_of_My_div_BSL(max_boot_torque_div_BSL)
+                iso11_din = self.iso11.calc_z_of_My_div_BSL(max_boot_torque_div_BSL)
             else:
-                iso13_din = self.iso13.calc_z_of_Mz_div_BSL(force_per_bsl)
-                iso11_din = self.iso11.calc_z_of_Mz_div_BSL(force_per_bsl)
+                iso13_din = self.iso13.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL)
+                iso11_din = self.iso11.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL)
             self.logger.info(f"ISO13 {iso13_din}, ISO11: {iso11_din}")
             
             # add data to GUI labels for user to read
-            self.peak_my_label.setText(self.peak_torque_str + str(force_per_bsl) + "N")
+            self.peak_my_label.setText(self.peak_torque_div_BSL_str + str(round(max_boot_torque_div_BSL, 2)) + "N")
             self.max_force_at.setText(self.max_force_at_str + str(self.max_strain_dist) + "mm")
             self.din_value_13.setText(self.din_13_str + "<b>" + str(iso13_din) + "</b>") 
             self.din_value_11.setText(self.din_11_str + "<b>" + str(iso11_din) + "</b>")  
             self.estimated_speed_lbl.setText(self.estimated_speed_str + str(estimated_speed) + "m/s")
+            self.estimated_angular_speed_lbl.setText(self.estimated_angular_speed_str + str(estimated_angular_speed) + "deg/s")
             
             self.populate_distance_times_table(self.distances)  # update speeds table
             
@@ -282,11 +299,11 @@ class AlpenFlowApp(QMainWindow):
             if not self.save_graph_checkbox.isChecked():
                 self.ax.clear()
                 self.graph_numb = 0
-                self.ax.scatter(self.distances, self.forces, alpha=.3, linewidths=.3)
-            self.ax.plot(self.aggregate_dist, self.aggregate_force, label="Run " + str(self.graph_numb))
+                self.ax.scatter(self.distances, self.boot_torques_div_BSL, alpha=.3, linewidths=.3)
+            self.ax.plot(self.aggregate_dist, self.aggregate_boot_torques_div_BSL, label="Run " + str(self.graph_numb))
             self.ax.set_title("Force vs. Distance Curve")
             self.ax.set_xlabel("Distance (mm)")
-            self.ax.set_ylabel("Force (N)")
+            self.ax.set_ylabel("Boot Torque/BSL (N)")
             self.graph_numb += 1
             if self.save_graph_checkbox.isChecked():
                 self.ax.legend()
@@ -317,11 +334,12 @@ class AlpenFlowApp(QMainWindow):
         """
         unique_dist = np.unique(distances)
         unique_dist = np.sort(unique_dist)
+        sample_rate = np.average(np.diff(self.torque_times))
 
         for i in range(1, 31):
             mask = distances == i
             number_samples = np.sum(mask)
-            durration = self.sample_rate * number_samples
+            durration = sample_rate * number_samples
             durration = round(durration, 2)
             if durration == 0:
                 self.table_of_counts.setItem(0, i-1, QTableWidgetItem(""))
@@ -329,7 +347,7 @@ class AlpenFlowApp(QMainWindow):
                 self.table_of_counts.setItem(0, i-1, QTableWidgetItem(str(durration) + "s"))
 
         
-    def derive_speed_from_distances(self, dists: np.array) -> float:
+    def derive_speed_from_distances(self, dists: np.array) -> Tuple[float, float]:
         """Calculates the speed of the boot release based on sample rate + distance
         
         Over the distance of 2mm to 10mm we travel .08 meters. Each sample is 
@@ -339,18 +357,24 @@ class AlpenFlowApp(QMainWindow):
             dists (np.array): distances returned durring data collection
 
         Returns:
-            float: speed in meters per second
+            float, float: speed in meters per second and angular speed in deg/s
         """
         start_dist = 2  #mm
         end_dist = 10  #mm
+        covered_distance = end_dist - start_dist
         try:
+            sample_rate = np.average(np.diff(self.torque_times))
+            self.logger.info(f"Sampling rate of tof was {round(sample_rate, 4)} samples/sec")
             numb_distances = np.sum((dists >= start_dist) & (dists < end_dist))
-            durration = numb_distances * self.sample_rate  # seconds
-            speed = ((end_dist - start_dist) * .001) / durration  # meters per second
-            return round(speed, 2)
+            durration = numb_distances * sample_rate  # seconds
+            speed = (covered_distance * .001) / durration  # meters per second
+            angular_speed = np.rad2deg(np.arcsin(covered_distance / int(self.bsl_input_box.text()))) / durration
+            print("DEBUG", np.rad2deg(np.arcsin(covered_distance / int(self.bsl_input_box.text()))), durration)
+            return round(speed, 2), round(angular_speed, 4)
         except ZeroDivisionError:
             self.logger.error("Could not derive speed from distance measurements: \n", dists)
             return 0
+    
         
     class Worker(QThread):
         finished = pyqtSignal()
@@ -365,7 +389,10 @@ class AlpenFlowApp(QMainWindow):
             super().__init__(parent)
             self.self = parent
             self.distances = np.zeros(parent.max_index)
-            self.forces = np.zeros(parent.max_index)
+            self.boot_torques = np.zeros(parent.max_index)
+            self.torque_times = np.zeros(parent.max_index)
+            self.raw_torques = np.zeros(parent.max_raw_torques_index)
+            self.raw_torque_times = np.zeros(parent.max_raw_torques_index)
             
             # Setup the internal logger
             self.logger = logging.getLogger(__name__)
@@ -390,22 +417,28 @@ class AlpenFlowApp(QMainWindow):
                 tuple: distances, forces
             """
             index = 0  # tracks location in numpy arrays for dist/force
+            raw_torque_index = 1
             dist_counter = 0  # force function end after 10 instances of boot gone
             first_dist = False
             self.self.serial.reset_buffer()
+            start_time = time.time()
             
             # Collect data for 30s or until we have 200ms of too far of dists 
-            while (index < self.self.max_index) and dist_counter < 20:
+            while (index < self.self.max_index) and dist_counter < 20 and (time.time() - start_time) < 12:
                 # get the arduino distance measurement to log or synchronize
                 distance_measurement = self.self.serial.get_arduino_data()
+                
+                current_torque = self.self.phidget.recent_measurement
+                    
+                # now handle the tof + force if tof measurement made
                 if distance_measurement != None:
                     # Want to normalize distance relative to initial distance
                     if not first_dist:
                         first_dist = distance_measurement
                     # since arduino reported data, we get phidget data and log it
-                    # self.forces[index] = index
-                    self.forces[index] = self.self.phidget.recent_measurement
+                    self.boot_torques[index] = current_torque
                     self.distances[index] = distance_measurement - first_dist
+                    self.torque_times[index] = time.time() - start_time
                     index += 1
                     if (distance_measurement - first_dist) > self.self.numb_mm_to_measure + 1:
                         dist_counter += 1
@@ -414,10 +447,22 @@ class AlpenFlowApp(QMainWindow):
                     if first_dist > 240:
                         self.logger.warning("The Boot is too far away from the sensor. 240mm is the maximum distance.")
                         self.distances = np.zeros(self.self.max_index)
-                        self.forces = np.zeros(self.self.max_index)
+                        self.boot_torques = np.zeros(self.self.max_index)
+                        self.torque_times = np.zeros(self.self.max_index)
+                        self.raw_torques = np.zeros(self.self.max_raw_torques_index)
+                        self.raw_torque_times = np.zeros(self.self.max_raw_torques_index)
                         break
+                    
+                # log the torques constantly. Don't correlate them with phidget measurement
+                if raw_torque_index < self.self.max_raw_torques_index - 2 and (time.time() - start_time) - self.raw_torque_times[raw_torque_index - 1] > .0001:
+                    self.raw_torques[raw_torque_index] = current_torque
+                    self.raw_torque_times[raw_torque_index] = time.time() - start_time
+                    raw_torque_index += 1
+                elif raw_torque_index == self.self.max_raw_torques_index - 2:
+                    print(f"max torque index {self.self.max_raw_torques_index} is too small for sample rate. Considering increasing.")
+                    raw_torque_index += 1
             
-            self.result.emit((self.distances[:index], self.forces[:index]))
+            self.result.emit((self.distances[:index], self.boot_torques[:index], self.torque_times[:index], self.raw_torques[:raw_torque_index], self.raw_torque_times[:raw_torque_index]))
             self.finished.emit()
 
     def on_option_change(self):
@@ -441,8 +486,10 @@ class AlpenFlowApp(QMainWindow):
     def save_data(self):
         """Saves the dist/force data in memory to two csvs. Processed and raw"""
         f_name = self.csv_name_input.text() + ".csv"
+        f_name_raw_torque_div_BSL = self.csv_name_input.text() + "_raw_torque_div_bsl.csv"
         f_graphed_name = self.csv_name_input.text() + "_graphed" + ".csv"
         csv_fname = os.path.join(self.log_dir, f_name)
+        csv_fname_raw = os.path.join(self.log_dir, f_name_raw_torque_div_BSL)
         csv_graphed_name = os.path.join(self.log_dir, f_graphed_name)
 
         # Check if log exists and should therefore be rolled
@@ -457,14 +504,16 @@ class AlpenFlowApp(QMainWindow):
             return
         else:
             # Stack the arrays column-wise
-            data = np.column_stack((self.distances, self.forces))
-            graphed_data = np.column_stack((self.aggregate_dist, self.aggregate_force))
+            data = np.column_stack((self.distances, self.boot_torques_div_BSL))
+            raw_bsl_data = np.column_stack((self.raw_torque_times, self.raw_torques_div_BSL))
+            graphed_data = np.column_stack((self.aggregate_dist, self.aggregate_boot_torques_div_BSL))
 
             # Save to CSV
-            np.savetxt(csv_fname, data, delimiter=',', header='Distance[mm],Force[N]', fmt='%.4f')
-            np.savetxt(csv_graphed_name, graphed_data, delimiter=',', header='Distance[mm],Force[N]', fmt='%.4f')
+            np.savetxt(csv_fname, data, delimiter=',', header='Distance[mm],Torque_div_BSL[N]', fmt='%.4f')
+            np.savetxt(csv_fname_raw, raw_bsl_data, delimiter=',', header='Time[s],Torque_div_BSL[N]', fmt='%.4f')
+            np.savetxt(csv_graphed_name, graphed_data, delimiter=',', header='Distance[mm],Torque_div_BSL[N]', fmt='%.4f')
             
-            self.logger.info("Saved data to:\n\t" + csv_fname + " and \n\t" + csv_graphed_name)
+            self.logger.info("Saved data to:\n\t" + csv_fname + f"\n\t{csv_fname_raw}" + "\n\t" + csv_graphed_name)
             
             # Change the button color
             self.save_data_button.setStyleSheet("background-color: green")
@@ -479,7 +528,7 @@ class AlpenFlowApp(QMainWindow):
         """Revert the button color to the original style"""
         self.save_data_button.setStyleSheet(self.original_style)
         self.save_data_button.setText("Save Data")
-        self.csv_name_input.setText("Din_data_" + datetime.now().strftime("%Y%m%d_%H%M"))
+        self.csv_name_input.setText(f"Din_data_{self.bsl_input_box.text()}_My_{self.testing_My}" + datetime.now().strftime("%Y%m%d_%H%M"))
         
 # entry point of application
 if __name__ == "__main__":

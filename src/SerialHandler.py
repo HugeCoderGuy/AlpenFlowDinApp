@@ -169,7 +169,7 @@ if __name__ == '__main__':
     while True:
         data = ser.get_arduino_data()
         if data != None:
-            print(data)
+            print(data, time.time())
         
         count += 1
         if count == 1000000:

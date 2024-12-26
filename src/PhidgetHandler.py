@@ -68,24 +68,28 @@ class PhidgetHandler():
         # print(self.interpret_voltage_data(np.array(self.recent_measurement), True))
         
     def interpret_voltage_data(self, data: np.array, my_data: bool) -> np.array:
-        """Takes voltage ratio data from phidget and converts to force in Newtons
+        """Takes voltage ratio data from phidget and converts to torque on boot in Nm
         
         Args:
             data (np.array): voltage ratio data from phidget array
             my_data (bool): True if data is from My sensor, False if data is from Mz
         Returns:
-            np.array: force in Newtons for each sample
+            np.array: torque on boot in Nm for each sample
         """
-        # convert data to kg
         if my_data:
-            weights = (data + self.my_cal['offset']) * self.my_cal['gain']
-            weights *= self.my_cal['lever_arm']
+            offset = self.my_cal['offset']
+            gain = self.my_cal['gain']
+            lever_arm = self.my_cal['lever_arm']
         else:
-            weights = (data + self.mz_cal['offset']) * self.mz_cal['gain']
-            weights *= self.mz_cal['lever_arm']
-        # forces = weights * 9.81  # convert to N
-        forces = weights  # Handling the force conversion with the phidget UI
-        return forces
+            offset = self.mz_cal['offset']
+            gain = self.mz_cal['gain']
+            lever_arm = self.mz_cal['lever_arm']
+            
+        # Load cell reading calculation can be found here: https://phidgets.com/docs/Calibrating_Load_Cells
+        # The equation at that link seems to be wrong!!!!!! We had to use a + instead of a -
+        load_cell_reading = (data + offset)*gain # [N]
+        torque_on_boot = load_cell_reading*lever_arm    # [Nm]
+        return torque_on_boot
         
     def close(self) -> None:
         self.ch.close()
