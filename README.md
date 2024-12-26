@@ -78,3 +78,5 @@ Major kudos go out to the AlpenFlow engineers, Steven and Jesse, for providing t
 Here's another image of the GUI running for yucks
 
 ![other_gui_img](/img/din_gui_running.png)
+![alpenflow_logo](/img/alpenflow_logo.png)
+
