@@ -12,6 +12,7 @@ from scipy.optimize import curve_fit
 import numpy as np
 from .ISO_11088 import ISO11088
 
+
 def createLinearArray(min_value, max_value, increment):
     '''
     Creates a linear array starting at min_value and going up to max_value

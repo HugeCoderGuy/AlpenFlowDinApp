@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # right click the file and copy relative path
-csv_file_relative_path = "Data\Steven's Tecnica Zero G Tour Pro Boot, right boot\Alpenflow 89, -Mz, PL=2.0, 20241221, Trial 1.csv"
+csv_file_relative_path = "Data\Alpenflow 89, My, PL=2.6, 20241228, Trial 1_raw_torque_div_bsl.csv"
 
 
 with open(csv_file_relative_path) as file:

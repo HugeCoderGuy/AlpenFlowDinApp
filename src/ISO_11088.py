@@ -5,7 +5,6 @@ Created on Thu Jun  6 08:29:19 2024
 
 @author: stevenwaal
 """
-# from smath import increasing
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit 
 import pandas as pd
@@ -38,6 +37,8 @@ def createLinearArray(min_value, max_value, increment):
     array = np.linspace(min_value, max_value, num=num_values)
     return array
 
+
+
 class ISO11088():
     
     def __init__(self, z_max=15):
@@ -45,8 +46,6 @@ class ISO11088():
         self.df_table_B1 = pd.read_csv(table_B1_file_path_and_name) # Read CSV into a pandas dataframe
         self.z_max = z_max
         self.update_all_values()
-        self.calc_curve_fit_z_of_My_div_BSL()
-        self.calc_curve_fit_z_of_Mz_div_BSL()
 
     def calc_high_and_low_boot_moments_divided_by_BSL_from_table_B1(self):
         df_z_table = self.df_table_B1.loc[:, '230':'351']
@@ -143,7 +142,58 @@ class ISO11088():
         My_div_BSL_copy.extend(self.table_B1_My_div_BSL_low)
         param, param_cov = curve_fit(self.fit_func_My_div_BSL_of_z, z_copy, My_div_BSL_copy)
         return param
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    # -- z as a function of Mz/BSL curve fit ---------------------------------- 
+    def calc_z_of_Mz_div_BSL(self, Mz_div_BSL, round_bool=True):
+        a = self.z_of_Mz_div_BSL_fit_params[0]
+        b = self.z_of_Mz_div_BSL_fit_params[1]
+        c = self.z_of_Mz_div_BSL_fit_params[2]
+        z = self.fit_func_z_of_Mz_div_BSL(Mz_div_BSL, a, b, c)
+        if round_bool:
+            return round(z)
+        return z
+    
+    def fit_func_z_of_Mz_div_BSL(self, Mz_div_BSL, a, b, c):
+        return a + b*Mz_div_BSL + c*Mz_div_BSL**2
         
+    def calc_curve_fit_z_of_Mz_div_BSL(self):
+        param, param_cov = curve_fit(self.fit_func_z_of_Mz_div_BSL, self.Mz_div_BSL_mid, self.z)
+        return param
+    
+    # -- z as a function of My/BSL curve fit ----------------------------------
+    def calc_z_of_My_div_BSL(self, My_div_BSL, round_bool=True):
+        a = self.z_of_My_div_BSL_fit_params[0]
+        b = self.z_of_My_div_BSL_fit_params[1]
+        c = self.z_of_My_div_BSL_fit_params[2]
+        z = self.fit_func_z_of_My_div_BSL(My_div_BSL, a, b, c)
+        if round_bool:
+            return round(z)
+        return z
+    
+    def fit_func_z_of_My_div_BSL(self, My_div_BSL, a, b, c):
+        return a + b*My_div_BSL + c*My_div_BSL**2
+        
+    def calc_curve_fit_z_of_My_div_BSL(self):
+        param, param_cov = curve_fit(self.fit_func_z_of_My_div_BSL, self.My_div_BSL_mid, self.z)
+        return param
+
+        
+
+
+
+
+
+
+
+
     # -- 'get' functions ------------------------------------------------------    
     def get_table_B1_z(self):
         return self.table_B1_z
@@ -192,7 +242,6 @@ class ISO11088():
         self.Mz_div_BSL_of_z_param = self.calc_curve_fit_Mz_div_BSL_of_z()
         self.My_div_BSL_of_z_param = self.calc_curve_fit_My_div_BSL_of_z()
             
-            
         z_start = max(self.table_B1_z)
         z_step  = 0.5
         
@@ -212,6 +261,17 @@ class ISO11088():
                 break
             
             
+            
+            
+            
+            
+            
+            
+            
+        self.z_of_Mz_div_BSL_fit_params = self.calc_curve_fit_z_of_Mz_div_BSL()
+        self.z_of_My_div_BSL_fit_params = self.calc_curve_fit_z_of_My_div_BSL()
+            
+            
         
         self.z_continuous = createLinearArray(min(self.table_B1_z), self.z_max, 0.1)
         self.Mz_div_BSL_curve_fit = []
@@ -219,6 +279,18 @@ class ISO11088():
         for z_value in self.z_continuous:
             self.Mz_div_BSL_curve_fit.append(self.calc_Mz_div_BSL(z_value))
             self.My_div_BSL_curve_fit.append(self.calc_My_div_BSL(z_value))
+           
+        self.Mz_div_BSL_continuous = createLinearArray(min(self.Mz_div_BSL_mid), max(self.Mz_div_BSL_mid), 0.1)
+        self.z_of_Mz_div_BSL_curve_fit = []
+        for Mz_div_BSL_value in self.Mz_div_BSL_continuous:
+            self.z_of_Mz_div_BSL_curve_fit.append(self.calc_z_of_Mz_div_BSL(Mz_div_BSL_value, round_bool=False))
+            
+        self.My_div_BSL_continuous = createLinearArray(min(self.My_div_BSL_mid), max(self.My_div_BSL_mid), 0.1)
+        self.z_of_My_div_BSL_curve_fit = []
+        for My_div_BSL_value in self.My_div_BSL_continuous:
+            self.z_of_My_div_BSL_curve_fit.append(self.calc_z_of_My_div_BSL(My_div_BSL_value, round_bool=False))
+
+
    
     # -- Plots ----------------------------------------------------------------
     def plot_boot_moments_divided_by_BSL(self):
@@ -246,62 +318,43 @@ class ISO11088():
         axs[col].legend()
         
         plt.tight_layout() # Adjusts layout so x and y labels don't overlap other plots
-        
-        
-    # ALEX ADDITIONS
-        # -- BSL as a function of Z curve fit -------------------------------------
-    def calc_BSL_of_z(self, z):
-        a = self.BSL_of_z_fit_params[0]
-        b = self.BSL_of_z_fit_params[1]
-        c = self.BSL_of_z_fit_params[2]
-        return self.fit_func_BSL_of_z(z, a, b, c)
-        
-    def fit_func_BSL_of_z(self, z, a, b, c):
-        return a + b*z**c
     
-    def calc_curve_fit_BSL_of_z(self):
-        param, param_cov = curve_fit(self.fit_func_BSL_of_z, self.z_continuous, self.table_2_BSL)
-        return param
-        
-    # -- z as a function of Mz/BSL curve fit ---------------------------------- 
-    def calc_z_of_Mz_div_BSL(self, Mz_div_BSL, round_bool=True):
-        a = self.z_of_Mz_div_BSL_fit_params[0]
-        b = self.z_of_Mz_div_BSL_fit_params[1]
-        c = self.z_of_Mz_div_BSL_fit_params[2]
-        z = self.fit_func_z_of_Mz_div_BSL(Mz_div_BSL, a, b, c)
-        if round_bool:
-            return round(z)
-        return z
     
-    def fit_func_z_of_Mz_div_BSL(self, Mz_div_BSL, a, b, c):
-        return a + b*Mz_div_BSL + c*Mz_div_BSL**2
+    def plot_z_of_boot_moments_div_BSL(self):
+        fig, axs = plt.subplots(1,2, figsize=(14,7))
+        fig.suptitle('ISO 11088 Z as a function of boot moment/BSL')    
         
-    def calc_curve_fit_z_of_Mz_div_BSL(self):
-        self.z_of_Mz_div_BSL_fit_params, param_cov = curve_fit(self.fit_func_z_of_Mz_div_BSL, self.Mz_div_BSL_curve_fit, self.z_continuous)
-        return self.z_of_Mz_div_BSL_fit_params
-    
-    # -- z as a function of My/BSL curve fit ----------------------------------
-    def calc_z_of_My_div_BSL(self, My_div_BSL, round_bool=True):
-        a = self.z_of_My_div_BSL_fit_params[0]
-        b = self.z_of_My_div_BSL_fit_params[1]
-        c = self.z_of_My_div_BSL_fit_params[2]
-        z = self.fit_func_z_of_My_div_BSL(My_div_BSL, a, b, c)
-        if round_bool:
-            return round(z)
-        return z
-    
-    def fit_func_z_of_My_div_BSL(self, My_div_BSL, a, b, c):
-        return a + b*My_div_BSL + c*My_div_BSL**2
+        col=0
+        axs[col].plot(self.table_B1_Mz_div_BSL_high, self.table_B1_z,  label='Table B1 High', color='gray', ls='-')
+        axs[col].plot(self.table_B1_Mz_div_BSL_low, self.table_B1_z, label='Table B1 Low', color='gray', ls='--')
+        axs[col].plot(self.table_B1_Mz_div_BSL_mid, self.table_B1_z, 'o', label='Table B1 Mid', color='tab:purple')
+        axs[col].plot(self.Mz_div_BSL_continuous, self.z_of_Mz_div_BSL_curve_fit, label='z of Mz/BSL curve fit', color='tab:green')
+        axs[col].set_xlabel('Mz/BSL [N]')
+        axs[col].set_ylabel('z [-]')
+        axs[col].legend()
         
-    def calc_curve_fit_z_of_My_div_BSL(self):
-        self.z_of_My_div_BSL_fit_params, param_cov = curve_fit(self.fit_func_z_of_My_div_BSL, self.Mz_div_BSL_curve_fit, self.z_continuous)
-        return self.z_of_My_div_BSL_fit_params
+        col=1
+        axs[col].plot(self.table_B1_My_div_BSL_high, self.table_B1_z, label='Table B1 High', color='gray', ls='-')
+        axs[col].plot(self.table_B1_My_div_BSL_low, self.table_B1_z, label='Table B1 Low', color='gray', ls='--')
+        axs[col].plot(self.table_B1_My_div_BSL_mid, self.table_B1_z, 'o', label='Table B1 Mid', color='tab:purple')
+        axs[col].plot(self.My_div_BSL_continuous, self.z_of_My_div_BSL_curve_fit, label='z of My/BSL curve fit', color='tab:green')
+        axs[col].set_xlabel('My/BSL [N]')
+        axs[col].set_ylabel('z [-]')
+        axs[col].legend()
+        
+        plt.tight_layout() # Adjusts layout so x and y labels don't overlap other plots
+    
+    
+    
+    
+    
     
 if __name__ == '__main__':
     plt.close('all')
     
     ISO11088 = ISO11088()
     ISO11088.plot_boot_moments_divided_by_BSL()
+    ISO11088.plot_z_of_boot_moments_div_BSL()
     
 
 

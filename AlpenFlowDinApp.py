@@ -87,7 +87,7 @@ class AlpenFlowApp(QMainWindow):
         # logic flags to determine branches
         self.graph_numb = 0
         self.saved_the_data = False
-        self.testing_My = False
+        self.testing_My = True # Starts out as testing My
         
         self.initUI()
         
@@ -482,6 +482,7 @@ class AlpenFlowApp(QMainWindow):
             self.testing_My = True
             self.combo_box.setStyleSheet(self.original_style)
             self.logger.info(f"Option changed to {self.combo_box.currentText()}")
+            
         
     def save_data(self):
         """Saves the dist/force data in memory to two csvs. Processed and raw"""

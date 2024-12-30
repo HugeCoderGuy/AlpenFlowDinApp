@@ -85,6 +85,8 @@ class PhidgetHandler():
             gain = self.mz_cal['gain']
             lever_arm = self.mz_cal['lever_arm']
             
+
+            
         # Load cell reading calculation can be found here: https://phidgets.com/docs/Calibrating_Load_Cells
         # The equation at that link seems to be wrong!!!!!! We had to use a + instead of a -
         load_cell_reading = (data + offset)*gain # [N]
