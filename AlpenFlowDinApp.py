@@ -279,18 +279,18 @@ class AlpenFlowApp(QMainWindow):
             # calculate the din values depending on test state
             # force_per_bsl = round(max_force / int(self.bsl_input_box.text()), 2)
             if self.testing_My:
-                iso13_din = self.iso13.calc_z_of_My_div_BSL(max_boot_torque_div_BSL)
-                iso11_din = self.iso11.calc_z_of_My_div_BSL(max_boot_torque_div_BSL)
+                iso13_din = self.iso13.calc_z_of_My_div_BSL(max_boot_torque_div_BSL, round_bool=False)
+                iso11_din = self.iso11.calc_z_of_My_div_BSL(max_boot_torque_div_BSL, round_bool=False)
             else:
-                iso13_din = self.iso13.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL)
-                iso11_din = self.iso11.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL)
+                iso13_din = self.iso13.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL, round_bool=False)
+                iso11_din = self.iso11.calc_z_of_Mz_div_BSL(max_boot_torque_div_BSL, round_bool=False)
             self.logger.info(f"ISO13 {iso13_din}, ISO11: {iso11_din}")
             
             # add data to GUI labels for user to read
             self.peak_my_label.setText(self.peak_torque_div_BSL_str + str(round(max_boot_torque_div_BSL, 2)) + "N")
             self.max_force_at.setText(self.max_force_at_str + str(self.max_strain_dist) + "mm")
-            self.din_value_13.setText(self.din_13_str + "<b>" + str(iso13_din) + "</b>") 
-            self.din_value_11.setText(self.din_11_str + "<b>" + str(iso11_din) + "</b>")  
+            self.din_value_13.setText(self.din_13_str + "<b>" + str(round(iso13_din, 2)) + "</b>") 
+            self.din_value_11.setText(self.din_11_str + "<b>" + str(round(iso11_din, 2)) + "</b>")  
             self.estimated_speed_lbl.setText(self.estimated_speed_str + str(estimated_speed) + "m/s")
             self.estimated_angular_speed_lbl.setText(self.estimated_angular_speed_str + str(estimated_angular_speed) + "deg/s")
             
