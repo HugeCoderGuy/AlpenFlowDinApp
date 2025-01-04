@@ -352,9 +352,14 @@ class ISO11088():
 if __name__ == '__main__':
     plt.close('all')
     
-    ISO11088 = ISO11088()
-    ISO11088.plot_boot_moments_divided_by_BSL()
-    ISO11088.plot_z_of_boot_moments_div_BSL()
+    _ISO11088 = ISO11088()
+    
+    print("Values are a, b, c")
+    print("mz values", _ISO11088.z_of_Mz_div_BSL_fit_params)
+    print("my_vbalues", _ISO11088.z_of_My_div_BSL_fit_params)
+    
+    # ISO11088.plot_boot_moments_divided_by_BSL()
+    # ISO11088.plot_z_of_boot_moments_div_BSL()
     
 
 

@@ -67,7 +67,7 @@ class PhidgetHandler():
         self.recent_measurement = np.mean(self.recent_samples)
         # print(self.interpret_voltage_data(np.array(self.recent_measurement), True))
         
-    def interpret_voltage_data(self, data: np.array, my_data: bool) -> np.array:
+    def interpret_voltage_data(self, data: np.array, my_data: bool, return_val_in_newtons=False) -> np.array:
         """Takes voltage ratio data from phidget and converts to torque on boot in Nm
         
         Args:
@@ -85,11 +85,11 @@ class PhidgetHandler():
             gain = self.mz_cal['gain']
             lever_arm = self.mz_cal['lever_arm']
             
-
-            
         # Load cell reading calculation can be found here: https://phidgets.com/docs/Calibrating_Load_Cells
         # The equation at that link seems to be wrong!!!!!! We had to use a + instead of a -
         load_cell_reading = (data + offset)*gain # [N]
+        if return_val_in_newtons:
+            return load_cell_reading
         torque_on_boot = load_cell_reading*lever_arm    # [Nm]
         return torque_on_boot
         
